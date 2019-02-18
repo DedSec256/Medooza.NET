@@ -1,12 +1,15 @@
 ﻿using System;
-using System.Diagnostics;
-using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
+using System.Windows.Automation;
+using Medooza.NET.Extensions;
 using Medooza.NET.Interfaces;
 using TestStack.White.Factory;
+using TestStack.White.UIA;
 using TestStack.White.WindowsAPI;
 using Application = TestStack.White.Application;
+using Cursor = System.Windows.Forms.Cursor;
 using Window = TestStack.White.UIItems.WindowItems.Window;
 
 namespace Medooza.NET.Implementations
@@ -14,8 +17,9 @@ namespace Medooza.NET.Implementations
     public class IdeaProcessManipulator : IIdeaProcessManipulator
     {
         private readonly Point _extractButtonPosition;
-        private Application _ideaApp;
         private Window _mainWindow;
+        private uint _turnedOffPixel;
+        private IntPtr _intPtr;
 
         public IdeaProcessManipulator(Point extractButtonPosition)
         {
@@ -24,33 +28,35 @@ namespace Medooza.NET.Implementations
 
         public IIdeaProcessManipulator Attach()
         {
-            _ideaApp = Application.Attach("idea64");
-            _mainWindow = _ideaApp.Find(title => title.Contains("IntelliJ IDEA"), InitializeOption.WithCache);
+            _mainWindow = Application.Attach("idea64")
+                                     .Find(title => title.Contains("IntelliJ IDEA"), InitializeOption.WithCache);
+            _intPtr = GetDC(IntPtr.Zero);
+            _turnedOffPixel = GetPixel(_intPtr, (int)_extractButtonPosition.X, (int)_extractButtonPosition.Y);
             return this;
         }
 
-        public IIdeaProcessManipulator GoToNextDuplicatesGroup(int waitTime = 150)
+        public IIdeaProcessManipulator GoToNextDuplicatesGroup(int waitTime = 120)
         {
             Thread.Sleep(waitTime);
             _mainWindow.Keyboard.PressSpecialKey(KeyboardInput.SpecialKeys.DOWN);
             return this;
         }
 
-        public IIdeaProcessManipulator DoIfExtractIsEnabled(Action action, int waitTime = 1500)
+        public IIdeaProcessManipulator DoIfExtractIsEnabled(Action action, int waitTime = 2500)
         {
-            var timer = new Stopwatch();
-            timer.Start();
-            while (timer.ElapsedMilliseconds < waitTime)
+            Cursor.Position = _extractButtonPosition.ToDrawingPoint();
+            if (Waiter.WaitWhile(() => GetPixel(_intPtr, (int)_extractButtonPosition.X, (int)_extractButtonPosition.Y) != _turnedOffPixel,
+                waitTime, 1200))
             {
-                _mainWindow.Mouse.Click(_extractButtonPosition);
-                var extractWindow = _ideaApp.GetWindows().FirstOrDefault(window => window.Title == "Extract method from duplicate code");
-                if (extractWindow == null) continue;
                 action();
-                extractWindow.Close();
-                break;
             }
-            timer.Stop();
             return this;
         }
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetDC(IntPtr hwnd);
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        private static extern uint GetPixel(IntPtr dc, int x, int y);
     }
 }
