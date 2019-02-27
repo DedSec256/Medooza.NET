@@ -1,15 +1,13 @@
 ﻿using System;
+using System.Media;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
-using System.Windows.Automation;
 using Medooza.NET.Extensions;
 using Medooza.NET.Interfaces;
 using TestStack.White.Factory;
-using TestStack.White.UIA;
 using TestStack.White.WindowsAPI;
 using Application = TestStack.White.Application;
-using Cursor = System.Windows.Forms.Cursor;
 using Window = TestStack.White.UIItems.WindowItems.Window;
 
 namespace Medooza.NET.Implementations
@@ -44,10 +42,10 @@ namespace Medooza.NET.Implementations
 
         public IIdeaProcessManipulator DoIfExtractIsEnabled(Action action, int waitTime = 2500)
         {
-            Cursor.Position = _extractButtonPosition.ToDrawingPoint();
             if (Waiter.WaitWhile(() => GetPixel(_intPtr, (int)_extractButtonPosition.X, (int)_extractButtonPosition.Y) != _turnedOffPixel,
                 waitTime, 1200))
             {
+                SystemSounds.Beep.Play();
                 action();
             }
             return this;
